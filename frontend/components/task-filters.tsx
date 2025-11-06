@@ -101,7 +101,7 @@ export function TaskFilters({
     debounceTimerRef.current = setTimeout(() => {
       lastSearchValueRef.current = search;
       updateFilters(search, company);
-    }, 800); 
+    }, 800);
 
     return () => {
       if (debounceTimerRef.current) {

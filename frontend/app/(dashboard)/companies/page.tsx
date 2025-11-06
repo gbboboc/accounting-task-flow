@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { CompanyCard } from "@/components/company-card"
+import { CompaniesList } from "@/components/companies-list"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -112,11 +112,7 @@ export default async function CompaniesPage({
           </Button>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {companiesWithStats.map((company) => (
-            <CompanyCard key={company.id} company={company} />
-          ))}
-        </div>
+        <CompaniesList companies={companiesWithStats} />
       )}
     </div>
   )
