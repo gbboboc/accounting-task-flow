@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,12 @@ import {
 import { Check, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { OrganizationType, TvaType, TaxRegime } from "@/lib/types";
+import type {
+  OrganizationType,
+  TvaType,
+  TaxRegime,
+  Company,
+} from "@/lib/types";
 
 const steps = [
   { id: 1, name: "Informații de bază", description: "Detalii companie" },
@@ -51,27 +56,65 @@ interface FormData {
   import_past_tasks: boolean;
 }
 
-export function CompanyFormWizard() {
+interface CompanyFormWizardProps {
+  companyId?: string;
+  initialData?: Partial<Company>;
+}
+
+export function CompanyFormWizard({
+  companyId,
+  initialData,
+}: CompanyFormWizardProps) {
   const router = useRouter();
+  const isEditMode = !!companyId;
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
-    name: "",
-    fiscal_code: "",
-    location: "",
-    contact_person: "",
-    phone: "",
-    email: "",
-    organization_type: "",
-    is_tva_payer: false,
-    tva_type: "",
-    has_employees: false,
-    employee_count: 0,
-    tax_regime: "",
-    accounting_start_date: "",
-    import_past_tasks: true,
+    name: initialData?.name || "",
+    fiscal_code: initialData?.fiscal_code || "",
+    location: initialData?.location || "",
+    contact_person: initialData?.contact_person || "",
+    phone: initialData?.phone || "",
+    email: initialData?.email || "",
+    organization_type:
+      (initialData?.organization_type as OrganizationType) || "",
+    is_tva_payer: initialData?.is_tva_payer || false,
+    tva_type: (initialData?.tva_type as TvaType) || "",
+    has_employees: initialData?.has_employees || false,
+    employee_count: initialData?.employee_count || 0,
+    tax_regime: (initialData?.tax_regime as TaxRegime) || "",
+    accounting_start_date: initialData?.accounting_start_date
+      ? new Date(initialData.accounting_start_date).toISOString().split("T")[0]
+      : "",
+    import_past_tasks: false,
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || "",
+        fiscal_code: initialData.fiscal_code || "",
+        location: initialData.location || "",
+        contact_person: initialData.contact_person || "",
+        phone: initialData.phone || "",
+        email: initialData.email || "",
+        organization_type:
+          (initialData.organization_type as OrganizationType) || "",
+        is_tva_payer: initialData.is_tva_payer || false,
+        tva_type: (initialData.tva_type as TvaType) || "",
+        has_employees: initialData.has_employees || false,
+        employee_count: initialData.employee_count || 0,
+        tax_regime: (initialData.tax_regime as TaxRegime) || "",
+        accounting_start_date: initialData.accounting_start_date
+          ? new Date(initialData.accounting_start_date)
+              .toISOString()
+              .split("T")[0]
+          : "",
+        import_past_tasks: false,
+      });
+    }
+  }, [initialData]);
 
   const updateFormData = (field: keyof FormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -120,66 +163,102 @@ export function CompanyFormWizard() {
 
       if (!user) throw new Error("Not authenticated");
 
-      // Create company
-      const { data: company, error: companyError } = await supabase
-        .from("companies")
-        .insert({
+      const companyData = {
+        name: formData.name,
+        fiscal_code: formData.fiscal_code,
+        location: formData.location,
+        contact_person: formData.contact_person || null,
+        phone: formData.phone || null,
+        email: formData.email || null,
+        organization_type: formData.organization_type,
+        is_tva_payer: formData.is_tva_payer,
+        tva_type: formData.is_tva_payer ? formData.tva_type : null,
+        has_employees: formData.has_employees,
+        employee_count: formData.has_employees ? formData.employee_count : 0,
+        tax_regime: formData.tax_regime,
+        accounting_start_date: formData.accounting_start_date,
+      };
+
+      if (isEditMode && companyId) {
+        // Update existing company
+        const { data: company, error: companyError } = await supabase
+          .from("companies")
+          .update(companyData)
+          .eq("id", companyId)
+          .eq("user_id", user.id)
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+
+        // Log activity
+        await supabase.from("activity_log").insert({
           user_id: user.id,
-          name: formData.name,
-          fiscal_code: formData.fiscal_code,
-          location: formData.location,
-          contact_person: formData.contact_person || null,
-          phone: formData.phone || null,
-          email: formData.email || null,
-          organization_type: formData.organization_type,
-          is_tva_payer: formData.is_tva_payer,
-          tva_type: formData.is_tva_payer ? formData.tva_type : null,
-          has_employees: formData.has_employees,
-          employee_count: formData.has_employees ? formData.employee_count : 0,
-          tax_regime: formData.tax_regime,
-          accounting_start_date: formData.accounting_start_date,
-          status: "active",
-        })
-        .select()
-        .single();
+          company_id: company.id,
+          action: "company_updated",
+          description: `Updated company: ${formData.name}`,
+        });
 
-      if (companyError) throw companyError;
+        toast.success("Compania a fost actualizată cu succes.");
+        router.push(`/companies/${company.id}`);
+        router.refresh();
+      } else {
+        // Create new company
+        const { data: company, error: companyError } = await supabase
+          .from("companies")
+          .insert({
+            ...companyData,
+            user_id: user.id,
+            status: "active",
+          })
+          .select()
+          .single();
 
-      // Generate tasks for the company
-      if (formData.import_past_tasks) {
-        const { error: tasksError } = await supabase.rpc(
-          "generate_tasks_for_company",
-          {
-            p_company_id: company.id,
-            p_start_date: formData.accounting_start_date,
-            p_months_ahead: 12,
+        if (companyError) throw companyError;
+
+        // Generate tasks for the company (only when creating)
+        if (formData.import_past_tasks) {
+          const { error: tasksError } = await supabase.rpc(
+            "generate_tasks_for_company",
+            {
+              p_company_id: company.id,
+              p_start_date: formData.accounting_start_date,
+              p_months_ahead: 12,
+            }
+          );
+
+          if (tasksError) {
+            console.error("Error generating tasks:", tasksError);
+            toast.error(
+              "Compania a fost creată, dar generarea sarcinilor a eșuat."
+            );
+          } else {
+            toast.success(
+              "Compania a fost creată și sarcinile au fost generate."
+            );
           }
-        );
-
-        if (tasksError) {
-          console.error("Error generating tasks:", tasksError);
-          toast.error(
-            "Compania a fost creată, dar generarea sarcinilor a eșuat."
-          );
         } else {
-          toast.success(
-            "Compania a fost creată și sarcinile au fost generate."
-          );
+          toast.success("Compania a fost creată cu succes.");
         }
+
+        // Log activity
+        await supabase.from("activity_log").insert({
+          user_id: user.id,
+          company_id: company.id,
+          action: "company_created",
+          description: `Created company: ${formData.name}`,
+        });
+
+        router.push(`/companies/${company.id}`);
+        router.refresh();
       }
-
-      // Log activity
-      await supabase.from("activity_log").insert({
-        user_id: user.id,
-        company_id: company.id,
-        action: "company_created",
-        description: `Created company: ${formData.name}`,
-      });
-
-      router.push(`/companies/${company.id}`);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+      toast.error(
+        isEditMode
+          ? "Eroare la actualizarea companiei."
+          : "Eroare la crearea companiei."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -512,21 +591,23 @@ export function CompanyFormWizard() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="import_past_tasks"
-                  checked={formData.import_past_tasks}
-                  onCheckedChange={(checked) =>
-                    updateFormData("import_past_tasks", checked)
-                  }
-                />
-                <Label
-                  htmlFor="import_past_tasks"
-                  className="cursor-pointer font-normal"
-                >
-                  Importează sarcini din trecut (de la data de început)
-                </Label>
-              </div>
+              {!isEditMode && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import_past_tasks"
+                    checked={formData.import_past_tasks}
+                    onCheckedChange={(checked) =>
+                      updateFormData("import_past_tasks", checked)
+                    }
+                  />
+                  <Label
+                    htmlFor="import_past_tasks"
+                    className="cursor-pointer font-normal"
+                  >
+                    Importează sarcini din trecut (de la data de început)
+                  </Label>
+                </div>
+              )}
             </div>
           )}
 
@@ -597,13 +678,23 @@ export function CompanyFormWizard() {
                 </dl>
               </div>
 
-              <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-                <p className="text-sm text-blue-900">
-                  <strong>Sarcini ce vor fi create:</strong> În funcție de
-                  setările companiei, vom genera automat sarcinile și termenele
-                  contabile corespunzătoare.
-                </p>
-              </div>
+              {!isEditMode && (
+                <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
+                  <p className="text-sm text-blue-900">
+                    <strong>Sarcini ce vor fi create:</strong> În funcție de
+                    setările companiei, vom genera automat sarcinile și
+                    termenele contabile corespunzătoare.
+                  </p>
+                </div>
+              )}
+              {isEditMode && (
+                <div className="rounded-lg bg-amber-50 p-4 border border-amber-200">
+                  <p className="text-sm text-amber-900">
+                    <strong>Notă:</strong> Modificările vor fi aplicate imediat.
+                    Sarcinile existente nu vor fi modificate.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -633,7 +724,13 @@ export function CompanyFormWizard() {
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Se creează..." : "Creează compania"}
+                {isSubmitting
+                  ? isEditMode
+                    ? "Se actualizează..."
+                    : "Se creează..."
+                  : isEditMode
+                  ? "Actualizează compania"
+                  : "Creează compania"}
               </Button>
             )}
           </div>
