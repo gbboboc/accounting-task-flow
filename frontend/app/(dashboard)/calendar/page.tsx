@@ -1,12 +1,16 @@
 import { createClient } from "@/lib/supabase/server"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { CalendarView } from "@/components/calendar-view"
+import { CalendarFilters } from "@/components/calendar-filters"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { redirect } from "next/navigation"
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ company?: string; monthly?: string; quarterly?: string; annual?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
@@ -16,8 +20,14 @@ export default async function CalendarPage() {
     redirect("/auth/login")
   }
 
-  // Fetch all tasks with company info
-  const { data: tasks } = await supabase
+  const { data: companies } = await supabase
+    .from("companies")
+    .select("id, name")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .order("name")
+
+  let query = supabase
     .from("tasks")
     .select(`
       *,
@@ -25,21 +35,47 @@ export default async function CalendarPage() {
         id,
         name,
         user_id
+      ),
+      task_templates(
+        frequency
       )
     `)
     .eq("companies.user_id", user.id)
     .order("due_date", { ascending: true })
 
-  // Get today's tasks
-  const today = new Date().toISOString().split("T")[0]
-  const todayTasks = tasks?.filter((t) => t.due_date === today && t.status !== "completed") || []
+  if (params.company && params.company !== "all") {
+    query = query.eq("company_id", params.company)
+  }
 
-  // Get upcoming tasks (next 7 days)
+  const { data: tasks } = await query
+
+  let filteredTasks = tasks || []
+  
+  const monthlyEnabled = params.monthly !== "false"
+  const quarterlyEnabled = params.quarterly !== "false"
+  const annualEnabled = params.annual !== "false"
+
+  if (!monthlyEnabled || !quarterlyEnabled || !annualEnabled) {
+    filteredTasks = filteredTasks.filter((task) => {
+      const frequency = (task.task_templates as { frequency?: string } | null)?.frequency
+      if (!frequency) return true 
+      
+      if (frequency === "monthly" && !monthlyEnabled) return false
+      if (frequency === "quarterly" && !quarterlyEnabled) return false
+      if (frequency === "annual" && !annualEnabled) return false
+      
+      return true
+    })
+  }
+
+  const today = new Date().toISOString().split("T")[0]
+  const todayTasks = filteredTasks.filter((t) => t.due_date === today && t.status !== "completed") || []
+
   const nextWeek = new Date()
   nextWeek.setDate(nextWeek.getDate() + 7)
   const upcomingTasks =
-    tasks
-      ?.filter((t) => {
+    filteredTasks
+      .filter((t) => {
         return t.status !== "completed" && t.due_date > today && t.due_date <= nextWeek.toISOString().split("T")[0]
       })
       .slice(0, 5) || []
@@ -50,7 +86,7 @@ export default async function CalendarPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <CalendarView tasks={tasks || []} />
+          <CalendarView tasks={filteredTasks} />
         </div>
 
         <div className="space-y-6">
@@ -103,25 +139,14 @@ export default async function CalendarPage() {
             <CardHeader>
               <CardTitle className="text-lg">Filtre</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="monthly" defaultChecked />
-                <Label htmlFor="monthly" className="text-sm font-normal cursor-pointer">
-                  Declarații lunare
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="quarterly" defaultChecked />
-                <Label htmlFor="quarterly" className="text-sm font-normal cursor-pointer">
-                  Rapoarte trimestriale
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="annual" defaultChecked />
-                <Label htmlFor="annual" className="text-sm font-normal cursor-pointer">
-                  Obligații anuale
-                </Label>
-              </div>
+            <CardContent>
+              <CalendarFilters
+                companies={companies || []}
+                initialCompany={params.company || "all"}
+                initialMonthly={params.monthly !== "false"}
+                initialQuarterly={params.quarterly !== "false"}
+                initialAnnual={params.annual !== "false"}
+              />
             </CardContent>
           </Card>
         </div>
