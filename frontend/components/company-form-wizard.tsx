@@ -23,14 +23,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Check, Info } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { OrganizationType, TvaType, TaxRegime } from "@/lib/types";
 
 const steps = [
-  { id: 1, name: "Basic Info", description: "Company details" },
-  { id: 2, name: "Organization", description: "Type and structure" },
-  { id: 3, name: "Fiscal", description: "Tax information" },
-  { id: 4, name: "Review", description: "Confirm details" },
+  { id: 1, name: "Informații de bază", description: "Detalii companie" },
+  { id: 2, name: "Organizare", description: "Tip și structură" },
+  { id: 3, name: "Fiscal", description: "Informații fiscale" },
+  { id: 4, name: "Revizuire", description: "Confirmați detaliile" },
 ];
 
 interface FormData {
@@ -80,23 +81,23 @@ export function CompanyFormWizard() {
     setError(null);
     if (currentStep === 1) {
       if (!formData.name || !formData.fiscal_code || !formData.location) {
-        setError("Please fill in all required fields");
+        setError("Vă rugăm completați toate câmpurile obligatorii");
         return;
       }
     }
     if (currentStep === 2) {
       if (!formData.organization_type) {
-        setError("Please select an organization type");
+        setError("Vă rugăm selectați tipul organizației");
         return;
       }
     }
     if (currentStep === 3) {
       if (!formData.tax_regime || !formData.accounting_start_date) {
-        setError("Please fill in all required fields");
+        setError("Vă rugăm completați toate câmpurile obligatorii");
         return;
       }
       if (formData.is_tva_payer && !formData.tva_type) {
-        setError("Please select TVA type");
+        setError("Vă rugăm selectați tipul TVA");
         return;
       }
     }
@@ -155,7 +156,16 @@ export function CompanyFormWizard() {
           }
         );
 
-        if (tasksError) console.error("Error generating tasks:", tasksError);
+        if (tasksError) {
+          console.error("Error generating tasks:", tasksError);
+          toast.error(
+            "Compania a fost creată, dar generarea sarcinilor a eșuat."
+          );
+        } else {
+          toast.success(
+            "Compania a fost creată și sarcinile au fost generate."
+          );
+        }
       }
 
       // Log activity
@@ -231,7 +241,7 @@ export function CompanyFormWizard() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  Company Name <span className="text-error">*</span>
+                  Numele companiei <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -242,7 +252,7 @@ export function CompanyFormWizard() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fiscal_code">
-                  Fiscal Code (IDNO) <span className="text-error">*</span>
+                  Cod fiscal (IDNO) <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="fiscal_code"
@@ -255,7 +265,7 @@ export function CompanyFormWizard() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">
-                  Location <span className="text-error">*</span>
+                  Locație <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="location"
@@ -265,7 +275,7 @@ export function CompanyFormWizard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact_person">Contact Person</Label>
+                <Label htmlFor="contact_person">Persoană de contact</Label>
                 <Input
                   id="contact_person"
                   value={formData.contact_person}
@@ -277,7 +287,7 @@ export function CompanyFormWizard() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Număr de telefon</Label>
                   <Input
                     id="phone"
                     type="tel"
@@ -304,7 +314,8 @@ export function CompanyFormWizard() {
           {currentStep === 2 && (
             <div className="space-y-4">
               <Label>
-                Select organization type <span className="text-error">*</span>
+                Selectați tipul de organizație{" "}
+                <span className="text-error">*</span>
               </Label>
               <RadioGroup
                 value={formData.organization_type}
@@ -382,7 +393,7 @@ export function CompanyFormWizard() {
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="space-y-4">
-                <Label>Taxation regime</Label>
+                <Label>Regim de impozitare</Label>
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="tva_payer"
@@ -395,7 +406,7 @@ export function CompanyFormWizard() {
                     htmlFor="tva_payer"
                     className="cursor-pointer font-normal"
                   >
-                    TVA Plătitor
+                    TVA plătitor
                   </Label>
                 </div>
                 {formData.is_tva_payer && (
@@ -410,7 +421,7 @@ export function CompanyFormWizard() {
                         htmlFor="lunar"
                         className="cursor-pointer font-normal"
                       >
-                        Lunar (Monthly)
+                        Lunar
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -419,7 +430,7 @@ export function CompanyFormWizard() {
                         htmlFor="trimestrial"
                         className="cursor-pointer font-normal"
                       >
-                        Trimestrial (Quarterly)
+                        Trimestrial
                       </Label>
                     </div>
                   </RadioGroup>
@@ -440,12 +451,12 @@ export function CompanyFormWizard() {
                     htmlFor="has_employees"
                     className="cursor-pointer font-normal"
                   >
-                    Has Employees
+                    Are angajați
                   </Label>
                 </div>
                 {formData.has_employees && (
                   <div className="ml-6 space-y-2">
-                    <Label htmlFor="employee_count">Number of employees</Label>
+                    <Label htmlFor="employee_count">Număr de angajați</Label>
                     <Input
                       id="employee_count"
                       type="number"
@@ -465,24 +476,22 @@ export function CompanyFormWizard() {
 
               <div className="space-y-2">
                 <Label htmlFor="tax_regime">
-                  Tax regime <span className="text-error">*</span>
+                  Regim de taxare <span className="text-error">*</span>
                 </Label>
                 <Select
                   value={formData.tax_regime}
                   onValueChange={(value) => updateFormData("tax_regime", value)}
                 >
                   <SelectTrigger id="tax_regime">
-                    <SelectValue placeholder="Select tax regime" />
+                    <SelectValue placeholder="Selectați regimul de taxare" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="general">
-                      General taxation regime
-                    </SelectItem>
+                    <SelectItem value="general">Regim general</SelectItem>
                     <SelectItem value="simplified">
-                      Simplified (Microenterprise 4%)
+                      Simplificat (Microîntreprindere 4%)
                     </SelectItem>
                     <SelectItem value="agricultural">
-                      Agricultural tax
+                      Impozit agricol
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -490,7 +499,8 @@ export function CompanyFormWizard() {
 
               <div className="space-y-2">
                 <Label htmlFor="accounting_start_date">
-                  Accounting start date <span className="text-error">*</span>
+                  Data de început a contabilității{" "}
+                  <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="accounting_start_date"
@@ -514,7 +524,7 @@ export function CompanyFormWizard() {
                   htmlFor="import_past_tasks"
                   className="cursor-pointer font-normal"
                 >
-                  Import past tasks (from start date)
+                  Importează sarcini din trecut (de la data de început)
                 </Label>
               </div>
             </div>
@@ -524,28 +534,28 @@ export function CompanyFormWizard() {
           {currentStep === 4 && (
             <div className="space-y-6">
               <div>
-                <h3 className="font-semibold mb-3">Basic Information</h3>
+                <h3 className="font-semibold mb-3">Informații de bază</h3>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Name:</dt>
+                    <dt className="text-muted-foreground">Nume:</dt>
                     <dd className="font-medium">{formData.name}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Fiscal Code:</dt>
+                    <dt className="text-muted-foreground">Cod fiscal:</dt>
                     <dd className="font-medium">{formData.fiscal_code}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Location:</dt>
+                    <dt className="text-muted-foreground">Locație:</dt>
                     <dd className="font-medium">{formData.location}</dd>
                   </div>
                 </dl>
               </div>
 
               <div>
-                <h3 className="font-semibold mb-3">Organization</h3>
+                <h3 className="font-semibold mb-3">Organizare</h3>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Type:</dt>
+                    <dt className="text-muted-foreground">Tip:</dt>
                     <dd className="font-medium">
                       {formData.organization_type}
                     </dd>
@@ -554,32 +564,32 @@ export function CompanyFormWizard() {
               </div>
 
               <div>
-                <h3 className="font-semibold mb-3">Fiscal Details</h3>
+                <h3 className="font-semibold mb-3">Detalii fiscale</h3>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">TVA Plătitor:</dt>
+                    <dt className="text-muted-foreground">TVA plătitor:</dt>
                     <dd className="font-medium">
                       {formData.is_tva_payer
-                        ? `Yes (${formData.tva_type})`
-                        : "No"}
+                        ? `Da (${formData.tva_type})`
+                        : "Nu"}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Employees:</dt>
+                    <dt className="text-muted-foreground">Angajați:</dt>
                     <dd className="font-medium">
                       {formData.has_employees
-                        ? `${formData.employee_count} employees`
-                        : "No employees"}
+                        ? `${formData.employee_count} angajați`
+                        : "Fără angajați"}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Tax Regime:</dt>
+                    <dt className="text-muted-foreground">Regim de taxare:</dt>
                     <dd className="font-medium capitalize">
                       {formData.tax_regime}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Start Date:</dt>
+                    <dt className="text-muted-foreground">Data de început:</dt>
                     <dd className="font-medium">
                       {formData.accounting_start_date}
                     </dd>
@@ -589,9 +599,9 @@ export function CompanyFormWizard() {
 
               <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
                 <p className="text-sm text-blue-900">
-                  <strong>Tasks to be created:</strong> Based on your company
-                  settings, we will automatically generate the appropriate
-                  accounting tasks and deadlines.
+                  <strong>Sarcini ce vor fi create:</strong> În funcție de
+                  setările companiei, vom genera automat sarcinile și termenele
+                  contabile corespunzătoare.
                 </p>
               </div>
             </div>
@@ -611,11 +621,11 @@ export function CompanyFormWizard() {
               onClick={handleBack}
               disabled={currentStep === 1 || isSubmitting}
             >
-              Back
+              Înapoi
             </Button>
             {currentStep < steps.length ? (
               <Button type="button" onClick={handleNext}>
-                Next
+                Înainte
               </Button>
             ) : (
               <Button
@@ -623,7 +633,7 @@ export function CompanyFormWizard() {
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Creating..." : "Create Company"}
+                {isSubmitting ? "Se creează..." : "Creează compania"}
               </Button>
             )}
           </div>

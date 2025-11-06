@@ -50,5 +50,43 @@ export class RpcService {
 
     return { status: 'ok' };
   }
+
+  async getTasksByCompany(params: {
+    companyId: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const supabase = this.supabaseService.getClient();
+
+    let query = supabase
+      .from('tasks')
+      .select('id, title, description, status, due_date, completed_at, template_id, depends_on_tasks', { count: 'exact' })
+      .eq('company_id', params.companyId)
+      .order('due_date', { ascending: true });
+
+    if (params.status) {
+      query = query.eq('status', params.status);
+    }
+
+    if (typeof params.offset === 'number') {
+      const from = params.offset;
+      const to = params.limit ? params.offset + params.limit - 1 : params.offset + 49;
+      query = query.range(from, to);
+    } else if (typeof params.limit === 'number') {
+      query = query.limit(params.limit);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      throw new HttpException(
+        { error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return { count, data };
+  }
 }
 
