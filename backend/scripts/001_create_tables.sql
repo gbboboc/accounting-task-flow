@@ -299,7 +299,8 @@ begin
       when public.check_task_dependencies(id) then 'pending'
       else 'blocked'
     end
-    where NEW.id = any(depends_on_tasks)
+    where depends_on_tasks is not null
+      and depends_on_tasks @> ARRAY[NEW.id]
       and status = 'blocked';
   end if;
   
