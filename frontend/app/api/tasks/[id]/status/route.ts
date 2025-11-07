@@ -41,8 +41,53 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "'completed' must be a boolean" }, { status: 400 })
   }
 
+  const { data: taskData, error: fetchTaskError } = await supabase
+    .from("tasks")
+    .select("depends_on_tasks, company_id, title")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (fetchTaskError) {
+    return NextResponse.json(
+      { error: fetchTaskError.message || "Failed to load task" },
+      { status: 400 },
+    )
+  }
+
+  if (!taskData) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 })
+  }
+
+  let newStatus: string
+  if (payload.completed) {
+    newStatus = "completed"
+  } else {
+    const dependsOnTasks = taskData.depends_on_tasks
+    if (dependsOnTasks && dependsOnTasks.length > 0) {
+      const { data: dependencies, error: depsError } = await supabase
+        .from("tasks")
+        .select("status")
+        .in("id", dependsOnTasks)
+
+      if (depsError) {
+        return NextResponse.json(
+          { error: depsError.message || "Failed to check dependencies" },
+          { status: 400 },
+        )
+      }
+
+      const allCompleted =
+        dependencies &&
+        dependencies.length === dependsOnTasks.length &&
+        dependencies.every((dep) => dep.status === "completed")
+      newStatus = allCompleted ? "pending" : "blocked"
+    } else {
+      newStatus = "pending"
+    }
+  }
+
   const updates = {
-    status: payload.completed ? "completed" : "pending",
+    status: newStatus,
     completed_at: payload.completed ? new Date().toISOString() : null,
     completed_by: payload.completed ? user.id : null,
   }
