@@ -108,6 +108,11 @@ export function TaskCard({ task }: TaskCardProps) {
       router.refresh();
     } catch (error) {
       console.error("Error updating task:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Eroare la actualizarea sarcinii. Vă rugăm să încercați din nou."
+      );
     } finally {
       setIsCompleting(false);
     }

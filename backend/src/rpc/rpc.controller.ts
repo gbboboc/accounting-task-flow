@@ -37,14 +37,46 @@ export class RpcController {
       );
     }
 
-    const parsedLimit = typeof limit === 'string' ? Number.parseInt(limit, 10) : undefined;
-    const parsedOffset = typeof offset === 'string' ? Number.parseInt(offset, 10) : undefined;
+    let validatedLimit: number | undefined;
+    let validatedOffset: number | undefined;
+
+    if (limit) {
+      const parsedLimit = Number.parseInt(limit, 10);
+      const parsedAsFloat = Number.parseFloat(limit);
+      if (
+        !Number.isFinite(parsedLimit) ||
+        parsedLimit < 1 ||
+        parsedLimit !== parsedAsFloat
+      ) {
+        throw new HttpException(
+          { error: 'limit must be a positive integer' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      validatedLimit = parsedLimit;
+    }
+
+    if (offset) {
+      const parsedOffset = Number.parseInt(offset, 10);
+      const parsedAsFloat = Number.parseFloat(offset);
+      if (
+        !Number.isFinite(parsedOffset) ||
+        parsedOffset < 0 ||
+        parsedOffset !== parsedAsFloat
+      ) {
+        throw new HttpException(
+          { error: 'offset must be a non-negative integer' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      validatedOffset = parsedOffset;
+    }
 
     return this.rpcService.getTasksByCompany({
       companyId,
       status,
-      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
-      offset: Number.isFinite(parsedOffset) ? parsedOffset : undefined,
+      limit: validatedLimit,
+      offset: validatedOffset,
     });
   }
 }

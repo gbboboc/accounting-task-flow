@@ -180,7 +180,6 @@ export function CompanyFormWizard({
       };
 
       if (isEditMode && companyId) {
-        // Update existing company
         const { data: company, error: companyError } = await supabase
           .from("companies")
           .update(companyData)
@@ -191,7 +190,6 @@ export function CompanyFormWizard({
 
         if (companyError) throw companyError;
 
-        // Log activity
         await supabase.from("activity_log").insert({
           user_id: user.id,
           company_id: company.id,
@@ -203,7 +201,6 @@ export function CompanyFormWizard({
         router.push(`/companies/${company.id}`);
         router.refresh();
       } else {
-        // Create new company
         const { data: company, error: companyError } = await supabase
           .from("companies")
           .insert({
@@ -216,7 +213,13 @@ export function CompanyFormWizard({
 
         if (companyError) throw companyError;
 
-        // Generate tasks for the company (only when creating)
+        await supabase.from("activity_log").insert({
+          user_id: user.id,
+          company_id: company.id,
+          action: "company_created",
+          description: `Created company: ${formData.name}`,
+        });
+
         if (formData.import_past_tasks) {
           const { error: tasksError } = await supabase.rpc(
             "generate_tasks_for_company",
@@ -230,8 +233,11 @@ export function CompanyFormWizard({
           if (tasksError) {
             console.error("Error generating tasks:", tasksError);
             toast.error(
-              "Compania a fost creată, dar generarea sarcinilor a eșuat."
+              "Compania a fost creată, dar generarea sarcinilor a eșuat. Puteți genera sarcinile manual mai târziu."
             );
+            router.push(`/companies/${company.id}`);
+            router.refresh();
+            return;
           } else {
             toast.success(
               "Compania a fost creată și sarcinile au fost generate."
@@ -240,14 +246,6 @@ export function CompanyFormWizard({
         } else {
           toast.success("Compania a fost creată cu succes.");
         }
-
-        // Log activity
-        await supabase.from("activity_log").insert({
-          user_id: user.id,
-          company_id: company.id,
-          action: "company_created",
-          description: `Created company: ${formData.name}`,
-        });
 
         router.push(`/companies/${company.id}`);
         router.refresh();
