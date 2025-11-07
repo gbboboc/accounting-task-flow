@@ -240,12 +240,26 @@ begin
         end loop;
         
       elsif v_template.frequency = 'weekly' then
-        for v_month_offset in 0..(p_months_ahead * 4) loop
-          v_due_date := p_start_date + (v_month_offset || ' weeks')::interval;
-          v_due_date := public.calculate_deadline_date(v_due_date, v_effective_deadline_day);
+        for v_month_offset in 0..p_months_ahead-1 loop
+          v_due_date := p_start_date + (v_month_offset || ' months')::interval;
+          v_due_date := date_trunc('week', v_due_date)::date + (v_effective_deadline_day - 1)::integer;
           
           if v_due_date < p_start_date then
-            continue;
+            v_due_date := v_due_date + interval '1 week';
+          end if;
+          
+          if v_due_date > p_start_date + (p_months_ahead || ' months')::interval then
+            exit;
+          end if;
+          
+          v_dependent_task_ids := array[]::uuid[];
+          if array_length(v_template.depends_on, 1) > 0 then
+            select array_agg(t.id)
+            into v_dependent_task_ids
+            from public.tasks t
+            where t.company_id = p_company_id
+              and t.template_id = any(v_template.depends_on)
+              and date_trunc('week', t.due_date) = date_trunc('week', v_due_date);
           end if;
           
           insert into public.tasks (
@@ -263,8 +277,11 @@ begin
             v_template.name, 
             v_template.description, 
             v_due_date, 
-            'pending',
-            array[]::uuid[]
+            case 
+              when array_length(v_dependent_task_ids, 1) > 0 then 'blocked'
+              else 'pending'
+            end,
+            v_dependent_task_ids
           )
           on conflict do nothing
           returning id into v_task_id;

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Building2 } from "lucide-react"
 import { AnimatedAuthBackground } from "@/components/animated-auth-background"
+import { getAuthRedirectUrl } from "@/lib/utils/auth-redirect"
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("")
@@ -45,7 +46,7 @@ export default function RegisterPage() {
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+          emailRedirectTo: getAuthRedirectUrl("/dashboard"),
           data: {
             full_name: fullName,
           },

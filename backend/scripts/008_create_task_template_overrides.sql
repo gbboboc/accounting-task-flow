@@ -2,7 +2,7 @@ create table if not exists public.task_template_overrides (
   id uuid primary key default uuid_generate_v4(),
   company_id uuid not null references public.companies(id) on delete cascade,
   template_id uuid not null references public.task_templates(id) on delete cascade,
-  is_disabled boolean default true,
+  is_disabled boolean default false,
   notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
