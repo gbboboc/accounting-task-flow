@@ -84,6 +84,7 @@ export interface NotificationPreferences {
   email_daily_summary: boolean
   email_task_reminder_7days: boolean
   email_task_reminder_3days: boolean
+  email_task_reminder_1day: boolean
   email_task_reminder_due: boolean
   email_overdue_tasks: boolean
   push_task_completed: boolean
