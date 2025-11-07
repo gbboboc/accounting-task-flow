@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { CompanyTemplateOverrides } from "@/components/company-template-overrides";
+import { ManualTaskForm } from "@/components/manual-task-form";
 
 export default async function CompanyDetailPage({
   params,
@@ -262,10 +263,15 @@ export default async function CompanyDetailPage({
         <TabsContent value="tasks" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Toate Sarcinile</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {tasks?.length || 0} sarcini pentru această companie
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Toate Sarcinile</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {tasks?.length || 0} sarcini pentru această companie
+                  </p>
+                </div>
+                <ManualTaskForm companyId={id} />
+              </div>
             </CardHeader>
             <CardContent>
               {!tasks || tasks.length === 0 ? (

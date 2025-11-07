@@ -77,6 +77,8 @@ export async function POST(
     template_id: string
     is_disabled: boolean
     notes?: string
+    custom_deadline_day?: number | null
+    custom_deadline_month?: number | null
   }
 
   try {
@@ -102,6 +104,29 @@ export async function POST(
     )
   }
 
+  if (
+    payload.custom_deadline_day !== undefined &&
+    payload.custom_deadline_day !== null &&
+    (payload.custom_deadline_day < 1 || payload.custom_deadline_day > 31)
+  ) {
+    return NextResponse.json(
+      { error: "custom_deadline_day must be between 1 and 31" },
+      { status: 400 }
+    )
+  }
+
+  // Validate custom deadline month if provided
+  if (
+    payload.custom_deadline_month !== undefined &&
+    payload.custom_deadline_month !== null &&
+    (payload.custom_deadline_month < 1 || payload.custom_deadline_month > 12)
+  ) {
+    return NextResponse.json(
+      { error: "custom_deadline_month must be between 1 and 12" },
+      { status: 400 }
+    )
+  }
+
   // Upsert the override (create or update)
   const { data: override, error: upsertError } = await supabase
     .from("task_template_overrides")
@@ -111,6 +136,8 @@ export async function POST(
         template_id: payload.template_id,
         is_disabled: payload.is_disabled,
         notes: payload.notes || null,
+        custom_deadline_day: payload.custom_deadline_day ?? null,
+        custom_deadline_month: payload.custom_deadline_month ?? null,
       },
       {
         onConflict: "company_id,template_id",

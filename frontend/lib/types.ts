@@ -99,6 +99,8 @@ export interface TaskTemplateOverride {
   template_id: string
   is_disabled: boolean
   notes?: string
+  custom_deadline_day?: number | null
+  custom_deadline_month?: number | null
   created_at: string
   updated_at: string
 }
