@@ -29,6 +29,9 @@ export default async function SettingsPage() {
   // Fetch task templates
   const { data: templates } = await supabase.from("task_templates").select("*").order("name")
 
+  // Check if user is admin
+  const isAdmin = profile?.role === "admin"
+
   return (
     <div className="space-y-8 max-w-4xl">
       <DashboardHeader title="Setări" description="Gestionați setările contului și preferințele" />
@@ -49,7 +52,7 @@ export default async function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="templates">
-          <TaskTemplatesSettings templates={templates || []} />
+          <TaskTemplatesSettings templates={templates || []} isAdmin={isAdmin} />
         </TabsContent>
       </Tabs>
     </div>

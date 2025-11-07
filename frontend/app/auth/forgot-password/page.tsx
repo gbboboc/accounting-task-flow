@@ -11,6 +11,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { Building2, ArrowLeft } from "lucide-react"
 import { AnimatedAuthBackground } from "@/components/animated-auth-background"
+import { getAuthRedirectUrl } from "@/lib/utils/auth-redirect"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -26,7 +27,7 @@ export default function ForgotPasswordPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: getAuthRedirectUrl("/auth/reset-password"),
       })
       if (error) throw error
       setSuccess(true)
