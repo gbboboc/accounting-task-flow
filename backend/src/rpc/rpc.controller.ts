@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, Query, HttpException } from '@nestjs/common';
 import { RpcService } from './rpc.service';
 import { GenerateTasksForCompanyDto } from './dto/generate-tasks.dto';
 
@@ -31,10 +31,10 @@ export class RpcController {
     @Query('offset') offset?: string,
   ) {
     if (!companyId) {
-      return {
-        error: 'company_id is required',
-        statusCode: HttpStatus.BAD_REQUEST,
-      };
+      throw new HttpException(
+        { error: 'company_id is required' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const parsedLimit = typeof limit === 'string' ? Number.parseInt(limit, 10) : undefined;
