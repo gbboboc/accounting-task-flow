@@ -77,38 +77,74 @@ export function TaskTemplateForm({
         reminder_days: template.reminder_days || [7, 3, 1],
         is_active: template.is_active !== undefined ? template.is_active : true,
       });
+    } else {
+      setFormData({
+        name: "",
+        description: "",
+        frequency: "monthly",
+        deadline_day: 1,
+        deadline_month: null,
+        applies_to_tva_payers: false,
+        applies_to_employers: false,
+        applies_to_org_types: [],
+        reminder_days: [7, 3, 1],
+        is_active: true,
+      });
     }
   }, [template, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!template) return;
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/task-templates/${template.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
+      if (template) {
+        const response = await fetch(`/api/task-templates/${template.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(formData),
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update template");
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to update template");
+        }
+
+        toast.success("Șablonul a fost actualizat cu succes");
+      } else {
+        const response = await fetch(`/api/task-templates`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to create template");
+        }
+
+        toast.success("Șablonul a fost creat cu succes");
       }
 
-      toast.success("Șablonul a fost actualizat cu succes");
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error("Error updating template:", error);
+      console.error(
+        `Error ${template ? "updating" : "creating"} template:`,
+        error
+      );
       toast.error(
         error instanceof Error
           ? error.message
-          : "Eroare la actualizarea șablonului. Vă rugăm să încercați din nou."
+          : `Eroare la ${
+              template ? "actualizarea" : "crearea"
+            } șablonului. Vă rugăm să încercați din nou.`
       );
     } finally {
       setIsSubmitting(false);
@@ -136,9 +172,13 @@ export function TaskTemplateForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editare Șablon Sarcină</DialogTitle>
+          <DialogTitle>
+            {template ? "Editare Șablon Sarcină" : "Creare Șablon Sarcină"}
+          </DialogTitle>
           <DialogDescription>
-            Modificați detaliile șablonului de sarcină
+            {template
+              ? "Modificați detaliile șablonului de sarcină"
+              : "Creați un nou șablon de sarcină pentru generarea automată"}
           </DialogDescription>
         </DialogHeader>
 
@@ -367,7 +407,13 @@ export function TaskTemplateForm({
               Anulează
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Salvează..." : "Salvează modificările"}
+              {isSubmitting
+                ? template
+                  ? "Salvează..."
+                  : "Creează..."
+                : template
+                ? "Salvează modificările"
+                : "Creează șablon"}
             </Button>
           </DialogFooter>
         </form>
