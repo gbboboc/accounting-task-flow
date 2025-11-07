@@ -53,7 +53,6 @@ interface FormData {
   employee_count: number;
   tax_regime: TaxRegime | "";
   accounting_start_date: string;
-  import_past_tasks: boolean;
 }
 
 interface CompanyFormWizardProps {
@@ -87,7 +86,6 @@ export function CompanyFormWizard({
     accounting_start_date: initialData?.accounting_start_date
       ? new Date(initialData.accounting_start_date).toISOString().split("T")[0]
       : "",
-    import_past_tasks: false,
   });
 
   useEffect(() => {
@@ -111,7 +109,6 @@ export function CompanyFormWizard({
               .toISOString()
               .split("T")[0]
           : "",
-        import_past_tasks: false,
       });
     }
   }, [initialData]);
@@ -220,31 +217,39 @@ export function CompanyFormWizard({
           description: `Created company: ${formData.name}`,
         });
 
-        if (formData.import_past_tasks) {
-          const { error: tasksError } = await supabase.rpc(
-            "generate_tasks_for_company",
-            {
-              p_company_id: company.id,
-              p_start_date: formData.accounting_start_date,
-              p_months_ahead: 12,
-            }
-          );
+        const { data: taskResult, error: tasksError } = await supabase.rpc(
+          "generate_tasks_for_company",
+          {
+            p_company_id: company.id,
+            p_start_date: formData.accounting_start_date,
+            p_months_ahead: 12,
+          }
+        );
 
-          if (tasksError) {
-            console.error("Error generating tasks:", tasksError);
-            toast.error(
-              "Compania a fost creată, dar generarea sarcinilor a eșuat. Puteți genera sarcinile manual mai târziu."
-            );
-            router.push(`/companies/${company.id}`);
-            router.refresh();
-            return;
-          } else {
+        if (tasksError) {
+          console.error("Error generating tasks:", tasksError);
+          toast.error(
+            `Compania a fost creată, dar generarea sarcinilor a eșuat: ${tasksError.message}. Puteți genera sarcinile manual mai târziu.`
+          );
+          router.push(`/companies/${company.id}`);
+          router.refresh();
+          return;
+        } else {
+          const tasksCreated = taskResult?.[0]?.tasks_created || 0;
+          const tasksSkipped = taskResult?.[0]?.tasks_skipped || 0;
+          if (tasksCreated > 0) {
             toast.success(
-              "Compania a fost creată și sarcinile au fost generate."
+              `Compania a fost creată și ${tasksCreated} sarcin${
+                tasksCreated === 1 ? "ă" : "i"
+              } ${tasksCreated === 1 ? "a fost" : "au fost"} generat${
+                tasksCreated === 1 ? "ă" : "e"
+              }.`
+            );
+          } else {
+            toast.warning(
+              "Compania a fost creată, dar nu au fost generate sarcini. Verificați setările companiei și șabloanele disponibile."
             );
           }
-        } else {
-          toast.success("Compania a fost creată cu succes.");
         }
 
         router.push(`/companies/${company.id}`);
@@ -587,25 +592,13 @@ export function CompanyFormWizard({
                     updateFormData("accounting_start_date", e.target.value)
                   }
                 />
+                {!isEditMode && (
+                  <p className="text-xs text-muted-foreground">
+                    Sarcinile vor fi generate automat pentru următoarele 12 luni
+                    de la data de început.
+                  </p>
+                )}
               </div>
-
-              {!isEditMode && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="import_past_tasks"
-                    checked={formData.import_past_tasks}
-                    onCheckedChange={(checked) =>
-                      updateFormData("import_past_tasks", checked)
-                    }
-                  />
-                  <Label
-                    htmlFor="import_past_tasks"
-                    className="cursor-pointer font-normal"
-                  >
-                    Importează sarcini din trecut (de la data de început)
-                  </Label>
-                </div>
-              )}
             </div>
           )}
 

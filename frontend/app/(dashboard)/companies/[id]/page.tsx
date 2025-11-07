@@ -18,6 +18,7 @@ import {
   Edit,
 } from "lucide-react"
 import Link from "next/link"
+import { CompanyTemplateOverrides } from "@/components/company-template-overrides"
 
 export default async function CompanyDetailPage({
   params,
@@ -62,6 +63,12 @@ export default async function CompanyDetailPage({
     .select("*")
     .eq("company_id", id)
     .order("due_date", { ascending: true })
+
+  // Fetch task templates for overrides management
+  const { data: templates } = await supabase
+    .from("task_templates")
+    .select("*")
+    .order("name")
 
   const today = new Date().toISOString().split("T")[0]
   const upcomingTasks = tasks?.filter((t) => t.status !== "completed" && t.due_date >= today).slice(0, 5) || []
@@ -188,6 +195,7 @@ export default async function CompanyDetailPage({
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="info">Company Info</TabsTrigger>
+          <TabsTrigger value="templates">Șabloane</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -289,6 +297,13 @@ export default async function CompanyDetailPage({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-6">
+          <CompanyTemplateOverrides
+            companyId={id}
+            templates={templates || []}
+          />
         </TabsContent>
       </Tabs>
     </div>

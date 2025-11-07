@@ -92,3 +92,13 @@ export interface NotificationPreferences {
   created_at: string
   updated_at: string
 }
+
+export interface TaskTemplateOverride {
+  id: string
+  company_id: string
+  template_id: string
+  is_disabled: boolean
+  notes?: string
+  created_at: string
+  updated_at: string
+}
