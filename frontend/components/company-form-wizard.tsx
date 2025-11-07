@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -23,14 +23,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Check, Info } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { OrganizationType, TvaType, TaxRegime } from "@/lib/types";
+import type {
+  OrganizationType,
+  TvaType,
+  TaxRegime,
+  Company,
+} from "@/lib/types";
 
 const steps = [
-  { id: 1, name: "Basic Info", description: "Company details" },
-  { id: 2, name: "Organization", description: "Type and structure" },
-  { id: 3, name: "Fiscal", description: "Tax information" },
-  { id: 4, name: "Review", description: "Confirm details" },
+  { id: 1, name: "Informații de bază", description: "Detalii companie" },
+  { id: 2, name: "Organizare", description: "Tip și structură" },
+  { id: 3, name: "Fiscal", description: "Informații fiscale" },
+  { id: 4, name: "Revizuire", description: "Confirmați detaliile" },
 ];
 
 interface FormData {
@@ -50,27 +56,65 @@ interface FormData {
   import_past_tasks: boolean;
 }
 
-export function CompanyFormWizard() {
+interface CompanyFormWizardProps {
+  companyId?: string;
+  initialData?: Partial<Company>;
+}
+
+export function CompanyFormWizard({
+  companyId,
+  initialData,
+}: CompanyFormWizardProps) {
   const router = useRouter();
+  const isEditMode = !!companyId;
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
-    name: "",
-    fiscal_code: "",
-    location: "",
-    contact_person: "",
-    phone: "",
-    email: "",
-    organization_type: "",
-    is_tva_payer: false,
-    tva_type: "",
-    has_employees: false,
-    employee_count: 0,
-    tax_regime: "",
-    accounting_start_date: "",
-    import_past_tasks: true,
+    name: initialData?.name || "",
+    fiscal_code: initialData?.fiscal_code || "",
+    location: initialData?.location || "",
+    contact_person: initialData?.contact_person || "",
+    phone: initialData?.phone || "",
+    email: initialData?.email || "",
+    organization_type:
+      (initialData?.organization_type as OrganizationType) || "",
+    is_tva_payer: initialData?.is_tva_payer || false,
+    tva_type: (initialData?.tva_type as TvaType) || "",
+    has_employees: initialData?.has_employees || false,
+    employee_count: initialData?.employee_count || 0,
+    tax_regime: (initialData?.tax_regime as TaxRegime) || "",
+    accounting_start_date: initialData?.accounting_start_date
+      ? new Date(initialData.accounting_start_date).toISOString().split("T")[0]
+      : "",
+    import_past_tasks: false,
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || "",
+        fiscal_code: initialData.fiscal_code || "",
+        location: initialData.location || "",
+        contact_person: initialData.contact_person || "",
+        phone: initialData.phone || "",
+        email: initialData.email || "",
+        organization_type:
+          (initialData.organization_type as OrganizationType) || "",
+        is_tva_payer: initialData.is_tva_payer || false,
+        tva_type: (initialData.tva_type as TvaType) || "",
+        has_employees: initialData.has_employees || false,
+        employee_count: initialData.employee_count || 0,
+        tax_regime: (initialData.tax_regime as TaxRegime) || "",
+        accounting_start_date: initialData.accounting_start_date
+          ? new Date(initialData.accounting_start_date)
+              .toISOString()
+              .split("T")[0]
+          : "",
+        import_past_tasks: false,
+      });
+    }
+  }, [initialData]);
 
   const updateFormData = (field: keyof FormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -80,23 +124,23 @@ export function CompanyFormWizard() {
     setError(null);
     if (currentStep === 1) {
       if (!formData.name || !formData.fiscal_code || !formData.location) {
-        setError("Please fill in all required fields");
+        setError("Vă rugăm completați toate câmpurile obligatorii");
         return;
       }
     }
     if (currentStep === 2) {
       if (!formData.organization_type) {
-        setError("Please select an organization type");
+        setError("Vă rugăm selectați tipul organizației");
         return;
       }
     }
     if (currentStep === 3) {
       if (!formData.tax_regime || !formData.accounting_start_date) {
-        setError("Please fill in all required fields");
+        setError("Vă rugăm completați toate câmpurile obligatorii");
         return;
       }
       if (formData.is_tva_payer && !formData.tva_type) {
-        setError("Please select TVA type");
+        setError("Vă rugăm selectați tipul TVA");
         return;
       }
     }
@@ -119,57 +163,100 @@ export function CompanyFormWizard() {
 
       if (!user) throw new Error("Not authenticated");
 
-      // Create company
-      const { data: company, error: companyError } = await supabase
-        .from("companies")
-        .insert({
+      const companyData = {
+        name: formData.name,
+        fiscal_code: formData.fiscal_code,
+        location: formData.location,
+        contact_person: formData.contact_person || null,
+        phone: formData.phone || null,
+        email: formData.email || null,
+        organization_type: formData.organization_type,
+        is_tva_payer: formData.is_tva_payer,
+        tva_type: formData.is_tva_payer ? formData.tva_type : null,
+        has_employees: formData.has_employees,
+        employee_count: formData.has_employees ? formData.employee_count : 0,
+        tax_regime: formData.tax_regime,
+        accounting_start_date: formData.accounting_start_date,
+      };
+
+      if (isEditMode && companyId) {
+        const { data: company, error: companyError } = await supabase
+          .from("companies")
+          .update(companyData)
+          .eq("id", companyId)
+          .eq("user_id", user.id)
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+
+        await supabase.from("activity_log").insert({
           user_id: user.id,
-          name: formData.name,
-          fiscal_code: formData.fiscal_code,
-          location: formData.location,
-          contact_person: formData.contact_person || null,
-          phone: formData.phone || null,
-          email: formData.email || null,
-          organization_type: formData.organization_type,
-          is_tva_payer: formData.is_tva_payer,
-          tva_type: formData.is_tva_payer ? formData.tva_type : null,
-          has_employees: formData.has_employees,
-          employee_count: formData.has_employees ? formData.employee_count : 0,
-          tax_regime: formData.tax_regime,
-          accounting_start_date: formData.accounting_start_date,
-          status: "active",
-        })
-        .select()
-        .single();
+          company_id: company.id,
+          action: "company_updated",
+          description: `Updated company: ${formData.name}`,
+        });
 
-      if (companyError) throw companyError;
+        toast.success("Compania a fost actualizată cu succes.");
+        router.push(`/companies/${company.id}`);
+        router.refresh();
+      } else {
+        const { data: company, error: companyError } = await supabase
+          .from("companies")
+          .insert({
+            ...companyData,
+            user_id: user.id,
+            status: "active",
+          })
+          .select()
+          .single();
 
-      // Generate tasks for the company
-      if (formData.import_past_tasks) {
-        const { error: tasksError } = await supabase.rpc(
-          "generate_tasks_for_company",
-          {
-            p_company_id: company.id,
-            p_start_date: formData.accounting_start_date,
-            p_months_ahead: 12,
+        if (companyError) throw companyError;
+
+        await supabase.from("activity_log").insert({
+          user_id: user.id,
+          company_id: company.id,
+          action: "company_created",
+          description: `Created company: ${formData.name}`,
+        });
+
+        if (formData.import_past_tasks) {
+          const { error: tasksError } = await supabase.rpc(
+            "generate_tasks_for_company",
+            {
+              p_company_id: company.id,
+              p_start_date: formData.accounting_start_date,
+              p_months_ahead: 12,
+            }
+          );
+
+          if (tasksError) {
+            console.error("Error generating tasks:", tasksError);
+            toast.error(
+              "Compania a fost creată, dar generarea sarcinilor a eșuat. Puteți genera sarcinile manual mai târziu."
+            );
+            router.push(`/companies/${company.id}`);
+            router.refresh();
+            return;
+          } else {
+            toast.success(
+              "Compania a fost creată și sarcinile au fost generate."
+            );
           }
-        );
+        } else {
+          toast.success("Compania a fost creată cu succes.");
+        }
 
-        if (tasksError) console.error("Error generating tasks:", tasksError);
+        router.push(`/companies/${company.id}`);
+        router.refresh();
       }
-
-      // Log activity
-      await supabase.from("activity_log").insert({
-        user_id: user.id,
-        company_id: company.id,
-        action: "company_created",
-        description: `Created company: ${formData.name}`,
-      });
-
-      router.push(`/companies/${company.id}`);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+      toast.error(
+        isEditMode
+          ? "Eroare la actualizarea companiei."
+          : "Eroare la crearea companiei."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -231,7 +318,7 @@ export function CompanyFormWizard() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  Company Name <span className="text-error">*</span>
+                  Numele companiei <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -242,7 +329,7 @@ export function CompanyFormWizard() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fiscal_code">
-                  Fiscal Code (IDNO) <span className="text-error">*</span>
+                  Cod fiscal (IDNO) <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="fiscal_code"
@@ -255,7 +342,7 @@ export function CompanyFormWizard() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">
-                  Location <span className="text-error">*</span>
+                  Locație <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="location"
@@ -265,7 +352,7 @@ export function CompanyFormWizard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact_person">Contact Person</Label>
+                <Label htmlFor="contact_person">Persoană de contact</Label>
                 <Input
                   id="contact_person"
                   value={formData.contact_person}
@@ -277,7 +364,7 @@ export function CompanyFormWizard() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Număr de telefon</Label>
                   <Input
                     id="phone"
                     type="tel"
@@ -304,7 +391,8 @@ export function CompanyFormWizard() {
           {currentStep === 2 && (
             <div className="space-y-4">
               <Label>
-                Select organization type <span className="text-error">*</span>
+                Selectați tipul de organizație{" "}
+                <span className="text-error">*</span>
               </Label>
               <RadioGroup
                 value={formData.organization_type}
@@ -382,7 +470,7 @@ export function CompanyFormWizard() {
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="space-y-4">
-                <Label>Taxation regime</Label>
+                <Label>Regim de impozitare</Label>
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="tva_payer"
@@ -395,7 +483,7 @@ export function CompanyFormWizard() {
                     htmlFor="tva_payer"
                     className="cursor-pointer font-normal"
                   >
-                    TVA Plătitor
+                    TVA plătitor
                   </Label>
                 </div>
                 {formData.is_tva_payer && (
@@ -410,7 +498,7 @@ export function CompanyFormWizard() {
                         htmlFor="lunar"
                         className="cursor-pointer font-normal"
                       >
-                        Lunar (Monthly)
+                        Lunar
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -419,7 +507,7 @@ export function CompanyFormWizard() {
                         htmlFor="trimestrial"
                         className="cursor-pointer font-normal"
                       >
-                        Trimestrial (Quarterly)
+                        Trimestrial
                       </Label>
                     </div>
                   </RadioGroup>
@@ -440,12 +528,12 @@ export function CompanyFormWizard() {
                     htmlFor="has_employees"
                     className="cursor-pointer font-normal"
                   >
-                    Has Employees
+                    Are angajați
                   </Label>
                 </div>
                 {formData.has_employees && (
                   <div className="ml-6 space-y-2">
-                    <Label htmlFor="employee_count">Number of employees</Label>
+                    <Label htmlFor="employee_count">Număr de angajați</Label>
                     <Input
                       id="employee_count"
                       type="number"
@@ -465,24 +553,22 @@ export function CompanyFormWizard() {
 
               <div className="space-y-2">
                 <Label htmlFor="tax_regime">
-                  Tax regime <span className="text-error">*</span>
+                  Regim de taxare <span className="text-error">*</span>
                 </Label>
                 <Select
                   value={formData.tax_regime}
                   onValueChange={(value) => updateFormData("tax_regime", value)}
                 >
                   <SelectTrigger id="tax_regime">
-                    <SelectValue placeholder="Select tax regime" />
+                    <SelectValue placeholder="Selectați regimul de taxare" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="general">
-                      General taxation regime
-                    </SelectItem>
+                    <SelectItem value="general">Regim general</SelectItem>
                     <SelectItem value="simplified">
-                      Simplified (Microenterprise 4%)
+                      Simplificat (Microîntreprindere 4%)
                     </SelectItem>
                     <SelectItem value="agricultural">
-                      Agricultural tax
+                      Impozit agricol
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -490,7 +576,8 @@ export function CompanyFormWizard() {
 
               <div className="space-y-2">
                 <Label htmlFor="accounting_start_date">
-                  Accounting start date <span className="text-error">*</span>
+                  Data de început a contabilității{" "}
+                  <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="accounting_start_date"
@@ -502,21 +589,23 @@ export function CompanyFormWizard() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="import_past_tasks"
-                  checked={formData.import_past_tasks}
-                  onCheckedChange={(checked) =>
-                    updateFormData("import_past_tasks", checked)
-                  }
-                />
-                <Label
-                  htmlFor="import_past_tasks"
-                  className="cursor-pointer font-normal"
-                >
-                  Import past tasks (from start date)
-                </Label>
-              </div>
+              {!isEditMode && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="import_past_tasks"
+                    checked={formData.import_past_tasks}
+                    onCheckedChange={(checked) =>
+                      updateFormData("import_past_tasks", checked)
+                    }
+                  />
+                  <Label
+                    htmlFor="import_past_tasks"
+                    className="cursor-pointer font-normal"
+                  >
+                    Importează sarcini din trecut (de la data de început)
+                  </Label>
+                </div>
+              )}
             </div>
           )}
 
@@ -524,28 +613,28 @@ export function CompanyFormWizard() {
           {currentStep === 4 && (
             <div className="space-y-6">
               <div>
-                <h3 className="font-semibold mb-3">Basic Information</h3>
+                <h3 className="font-semibold mb-3">Informații de bază</h3>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Name:</dt>
+                    <dt className="text-muted-foreground">Nume:</dt>
                     <dd className="font-medium">{formData.name}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Fiscal Code:</dt>
+                    <dt className="text-muted-foreground">Cod fiscal:</dt>
                     <dd className="font-medium">{formData.fiscal_code}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Location:</dt>
+                    <dt className="text-muted-foreground">Locație:</dt>
                     <dd className="font-medium">{formData.location}</dd>
                   </div>
                 </dl>
               </div>
 
               <div>
-                <h3 className="font-semibold mb-3">Organization</h3>
+                <h3 className="font-semibold mb-3">Organizare</h3>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Type:</dt>
+                    <dt className="text-muted-foreground">Tip:</dt>
                     <dd className="font-medium">
                       {formData.organization_type}
                     </dd>
@@ -554,32 +643,32 @@ export function CompanyFormWizard() {
               </div>
 
               <div>
-                <h3 className="font-semibold mb-3">Fiscal Details</h3>
+                <h3 className="font-semibold mb-3">Detalii fiscale</h3>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">TVA Plătitor:</dt>
+                    <dt className="text-muted-foreground">TVA plătitor:</dt>
                     <dd className="font-medium">
                       {formData.is_tva_payer
-                        ? `Yes (${formData.tva_type})`
-                        : "No"}
+                        ? `Da (${formData.tva_type})`
+                        : "Nu"}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Employees:</dt>
+                    <dt className="text-muted-foreground">Angajați:</dt>
                     <dd className="font-medium">
                       {formData.has_employees
-                        ? `${formData.employee_count} employees`
-                        : "No employees"}
+                        ? `${formData.employee_count} angajați`
+                        : "Fără angajați"}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Tax Regime:</dt>
+                    <dt className="text-muted-foreground">Regim de taxare:</dt>
                     <dd className="font-medium capitalize">
                       {formData.tax_regime}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Start Date:</dt>
+                    <dt className="text-muted-foreground">Data de început:</dt>
                     <dd className="font-medium">
                       {formData.accounting_start_date}
                     </dd>
@@ -587,13 +676,23 @@ export function CompanyFormWizard() {
                 </dl>
               </div>
 
-              <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-                <p className="text-sm text-blue-900">
-                  <strong>Tasks to be created:</strong> Based on your company
-                  settings, we will automatically generate the appropriate
-                  accounting tasks and deadlines.
-                </p>
-              </div>
+              {!isEditMode && (
+                <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
+                  <p className="text-sm text-blue-900">
+                    <strong>Sarcini ce vor fi create:</strong> În funcție de
+                    setările companiei, vom genera automat sarcinile și
+                    termenele contabile corespunzătoare.
+                  </p>
+                </div>
+              )}
+              {isEditMode && (
+                <div className="rounded-lg bg-amber-50 p-4 border border-amber-200">
+                  <p className="text-sm text-amber-900">
+                    <strong>Notă:</strong> Modificările vor fi aplicate imediat.
+                    Sarcinile existente nu vor fi modificate.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -611,11 +710,11 @@ export function CompanyFormWizard() {
               onClick={handleBack}
               disabled={currentStep === 1 || isSubmitting}
             >
-              Back
+              Înapoi
             </Button>
             {currentStep < steps.length ? (
               <Button type="button" onClick={handleNext}>
-                Next
+                Înainte
               </Button>
             ) : (
               <Button
@@ -623,7 +722,13 @@ export function CompanyFormWizard() {
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Creating..." : "Create Company"}
+                {isSubmitting
+                  ? isEditMode
+                    ? "Se actualizează..."
+                    : "Se creează..."
+                  : isEditMode
+                  ? "Actualizează compania"
+                  : "Creează compania"}
               </Button>
             )}
           </div>

@@ -1,10 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { TaskCard } from "@/components/task-card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TaskFilters } from "@/components/task-filters"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, CheckSquare } from "lucide-react"
+import { CheckSquare } from "lucide-react"
 import { redirect } from "next/navigation"
 
 export default async function TasksPage({
@@ -70,25 +69,11 @@ export default async function TasksPage({
       />
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Căutare sarcini..." className="pl-9" defaultValue={params.search} name="search" />
-        </div>
-        <Select defaultValue={params.company || "all"}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Toate Companiile" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Toate Companiile</SelectItem>
-            {companies?.map((company) => (
-              <SelectItem key={company.id} value={company.id}>
-                {company.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <TaskFilters
+        companies={companies || []}
+        initialSearch={params.search || ""}
+        initialCompany={params.company || "all"}
+      />
 
       {/* Tasks Tabs */}
       <Tabs defaultValue="pending" className="space-y-6">

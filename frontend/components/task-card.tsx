@@ -1,109 +1,122 @@
-"use client"
+"use client";
 
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Building2, Calendar, CheckCircle2 } from "lucide-react"
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import type { Task } from "@/lib/types"
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Building2, Calendar, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Task } from "@/lib/types";
+import { toast } from "sonner";
 
 interface TaskCardProps {
   task: Task & {
     company?: {
-      name: string
-    }
-  }
+      name: string;
+    };
+  };
 }
 
 export function TaskCard({ task }: TaskCardProps) {
-  const [isCompleting, setIsCompleting] = useState(false)
-  const router = useRouter()
+  const [isCompleting, setIsCompleting] = useState(false);
+  const router = useRouter();
 
   const getStatusColor = () => {
-    if (task.status === "completed") return "text-success"
-    if (task.status === "overdue") return "text-error"
-    if (task.status === "in_progress") return "text-warning"
-    return "text-muted-foreground"
-  }
+    if (task.status === "completed") return "text-success";
+    if (task.status === "overdue") return "text-error";
+    if (task.status === "in_progress") return "text-warning";
+    return "text-muted-foreground";
+  };
 
   const getStatusBadge = () => {
-    const today = new Date().toISOString().split("T")[0]
+    const today = new Date().toISOString().split("T")[0];
     if (task.status === "completed") {
       return (
-        <Badge variant="outline" className="bg-green-50 text-success border-success">
+        <Badge
+          variant="outline"
+          className="bg-green-50 text-success border-success"
+        >
           Completed
         </Badge>
-      )
+      );
     }
     if (task.due_date < today) {
       return (
         <Badge variant="outline" className="bg-red-50 text-error border-error">
           Overdue
         </Badge>
-      )
+      );
     }
     if (task.due_date === today) {
       return (
-        <Badge variant="outline" className="bg-yellow-50 text-warning border-warning">
+        <Badge
+          variant="outline"
+          className="bg-yellow-50 text-warning border-warning"
+        >
           Due Today
         </Badge>
-      )
+      );
     }
-    return <Badge variant="outline">Pending</Badge>
-  }
+    return <Badge variant="outline">Pending</Badge>;
+  };
 
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(dateString))
-  }
+    }).format(new Date(dateString));
+  };
 
-  const handleToggleComplete = async (checked: boolean) => {
-    setIsCompleting(true)
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+  const handleToggleComplete = async (nextValue: boolean | "indeterminate") => {
+    const completed = nextValue === true;
 
-    if (!user) {
-      setIsCompleting(false)
-      return
-    }
-
+    setIsCompleting(true);
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({
-          status: checked ? "completed" : "pending",
-          completed_at: checked ? new Date().toISOString() : null,
-          completed_by: checked ? user.id : null,
-        })
-        .eq("id", task.id)
+      const response = await fetch(`/api/tasks/${task.id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ completed }),
+      });
 
-      if (error) throw error
+      if (!response.ok) {
+        let message = "Failed to update task.";
 
-      // Log activity
-      if (checked) {
-        await supabase.from("activity_log").insert({
-          user_id: user.id,
-          company_id: task.company_id,
-          task_id: task.id,
-          action: "task_completed",
-          description: `Completed task: ${task.title}`,
-        })
+        try {
+          const payload = (await response.json()) as { error?: string };
+          if (payload?.error) {
+            message = payload.error;
+          }
+        } catch {
+          // ignore json parse errors
+        }
+
+        toast.error(message);
+        console.error("Error updating task:", message);
+        return;
       }
 
-      router.refresh()
+      if (completed) {
+        toast.success("Sarcina a fost cu succes finalizată");
+      } else {
+        toast.success("Sarcina a fost repornită");
+      }
+
+      router.refresh();
     } catch (error) {
-      console.error("Error updating task:", error)
+      console.error("Error updating task:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Eroare la actualizarea sarcinii. Vă rugăm să încercați din nou."
+      );
     } finally {
-      setIsCompleting(false)
+      setIsCompleting(false);
     }
-  }
+  };
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -117,12 +130,22 @@ export function TaskCard({ task }: TaskCardProps) {
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
-              <h3 className={`font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+              <h3
+                className={`font-medium ${
+                  task.status === "completed"
+                    ? "line-through text-muted-foreground"
+                    : ""
+                }`}
+              >
                 {task.title}
               </h3>
               {getStatusBadge()}
             </div>
-            {task.description && <p className="text-sm text-muted-foreground mb-3">{task.description}</p>}
+            {task.description && (
+              <p className="text-sm text-muted-foreground mb-3">
+                {task.description}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               {task.company && (
                 <div className="flex items-center gap-1">
@@ -145,5 +168,5 @@ export function TaskCard({ task }: TaskCardProps) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
